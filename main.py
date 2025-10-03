@@ -43,6 +43,13 @@ CONTRACT_ABI = [
         ],
         "name": "SupplyBlockMined",
         "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "readyForSupplyBlock",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "view",
+        "type": "function"
     }
 ]
 
@@ -53,27 +60,6 @@ async def send_telegram_message(bot, chat_id, message):
         logger.info(f"Sent Telegram message: {message}")
     except Exception as e:
         logger.error(f"Failed to send Telegram message: {e}")
-
-def handle_ready_for_supply_block(event, last_notified_extra_lp, contract, w3):
-    """Handle ReadyForSupplyBlock event, notify only when ready is true and extraLP crosses threshold."""
-    ready = event['args']['ready']
-    extra_lp = event['args']['extraLP']
-    initial_lp = event['args']['initialLP']
-    threshold_bps = event['args']['thresholdBps']
-    
-    # Calculate threshold
-    threshold = (initial_lp * threshold_bps) // 10_000
-    
-    # Notify only if ready is true and extraLP has significantly increased
-    if ready and extra_lp >= threshold and (last_notified_extra_lp == 0 or extra_lp >= last_notified_extra_lp + threshold // 10):
-        # Verify current state
-        try:
-            current_ready = contract.functions.readyForSupplyBlock().call()
-            if current_ready:
-                return "supplyBlock function ready", extra_lp
-        except Exception as e:
-            logger.error(f"Error calling readyForSupplyBlock: {e}")
-    return None, extra_lp
 
 def handle_supply_block_mined(event):
     """Handle SupplyBlockMined event."""
@@ -100,31 +86,30 @@ async def main():
     # Initialize Telegram bot
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     
-    # Track the last block processed and last notified extraLP
+    # Track the last block processed and last ready state
     last_block = w3.eth.get_block('latest')['number']
-    last_notified_extra_lp = 0  # Track last extraLP for which we sent a notification
+    last_ready_state = False  # Track if ready was true in last check
     
-    logger.info("Starting event polling...")
+    logger.info("Starting polling...")
     
     while True:
         try:
-            # Get the latest block
+            # Get the latest block for SupplyBlockMined events
             current_block = w3.eth.get_block('latest')['number']
             
-            # Poll for events in the block range
+            # Check readyForSupplyBlock() boolean
+            try:
+                current_ready = contract.functions.readyForSupplyBlock().call()
+                if current_ready and not last_ready_state:
+                    await send_telegram_message(bot, TELEGRAM_CHAT_ID, "supplyBlock function ready")
+                    last_ready_state = True
+                elif not current_ready and last_ready_state:
+                    last_ready_state = False  # Reset when ready becomes false
+            except Exception as e:
+                logger.error(f"Error calling readyForSupplyBlock: {e}")
+            
+            # Poll for SupplyBlockMined events
             if current_block > last_block:
-                # ReadyForSupplyBlock events
-                ready_events = contract.events.ReadyForSupplyBlock.get_logs(
-                    fromBlock=last_block + 1,
-                    toBlock=current_block
-                )
-                for event in ready_events:
-                    message, new_extra_lp = handle_ready_for_supply_block(event, last_notified_extra_lp, contract, w3)
-                    if message:
-                        await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
-                        last_notified_extra_lp = new_extra_lp
-                
-                # SupplyBlockMined events
                 supply_events = contract.events.SupplyBlockMined.get_logs(
                     fromBlock=last_block + 1,
                     toBlock=current_block
@@ -132,7 +117,7 @@ async def main():
                 for event in supply_events:
                     message = handle_supply_block_mined(event)
                     await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
-                    last_notified_extra_lp = 0  # Reset after supplyBlock resets extraLP
+                    last_ready_state = False  # Reset after supplyBlock resets extraLP
                 
                 last_block = current_block
             
