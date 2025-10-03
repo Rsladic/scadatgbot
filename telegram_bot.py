@@ -14,7 +14,7 @@ TELEGRAM_BOT_TOKEN = "7783890337:AAHAX7bHTKtMR8T3hIYKTNTj-f8lJBNL6XU"  # Replace
 TELEGRAM_CHAT_ID = "-1002696820701"     # Replace with your group chat ID
 
 # Blockchain Configuration
-RPC_URL = "rpc.pulsechain.com"  # Replace with PulseChain RPC URL (e.g., Infura, Alchemy, or public node)
+RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL (e.g., Infura, Alchemy, or public node)
 CONTRACT_ADDRESS = "0x563A4c367900e13Fe18659126458DBb200F9A4ba"  # Replace with your deployed SCADAManager contract address
 
 # SCADAManager Contract ABI (trimmed to include only the events we need)
