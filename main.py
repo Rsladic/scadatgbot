@@ -18,26 +18,6 @@ TELEGRAM_CHAT_ID = "-1002696820701"     # Replace with your group chat ID
 RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
 CONTRACT_ADDRESS = "0x563A4c367900e13Fe18659126458DBb200F9A4ba"  # Replace with your SCADAManager address
 
-import asyncio
-from web3 import Web3
-from web3.middleware import geth_poa_middleware
-from telegram import Bot
-import json
-import logging
-from datetime import datetime
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Replace with your bot token
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"     # Replace with your group chat ID
-
-# Blockchain Configuration
-RPC_URL = "YOUR_PULSECHAIN_RPC_URL"  # Replace with PulseChain RPC URL
-CONTRACT_ADDRESS = "YOUR_CONTRACT_ADDRESS"  # Replace with your SCADAManager address
-
 # Contract ABI (same as before)
 CONTRACT_ABI = [
     {
