@@ -4,6 +4,7 @@ from web3.middleware import geth_poa_middleware
 from telegram import Bot
 import json
 import logging
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,10 +15,10 @@ TELEGRAM_BOT_TOKEN = "7783890337:AAHAX7bHTKtMR8T3hIYKTNTj-f8lJBNL6XU"  # Replace
 TELEGRAM_CHAT_ID = "-1002696820701"     # Replace with your group chat ID
 
 # Blockchain Configuration
-RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL (e.g., Infura, Alchemy, or public node)
-CONTRACT_ADDRESS = "0x563A4c367900e13Fe18659126458DBb200F9A4ba"  # Replace with your deployed SCADAManager contract address
+RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
+CONTRACT_ADDRESS = "0x563A4c367900e13Fe18659126458DBb200F9A4ba"  # Replace with your SCADAManager address
 
-# SCADAManager Contract ABI (trimmed to include only the events we need)
+# Contract ABI (same as before)
 CONTRACT_ABI = [
     {
         "anonymous": False,
@@ -97,7 +98,7 @@ async def main():
     # Initialize Web3
     w3 = Web3(Web3.HTTPProvider(RPC_URL))
     
-    # Add PoA middleware for PulseChain compatibility
+    # Add PoA middleware for PulseChain
     w3.middleware_onion.inject(geth_poa_middleware, layer=0)
     
     if not w3.is_connected():
@@ -112,29 +113,43 @@ async def main():
     # Initialize Telegram bot
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     
-    # Set up event filters
-    ready_filter = contract.events.ReadyForSupplyBlock.create_filter(fromBlock='latest')
-    supply_block_filter = contract.events.SupplyBlockMined.create_filter(fromBlock='latest')
+    # Track the last block processed
+    last_block = w3.eth.get_block('latest')['number']
     
-    logger.info("Starting event listeners...")
+    logger.info("Starting event polling...")
     
     while True:
         try:
-            # Check for ReadyForSupplyBlock events
-            for event in ready_filter.get_new_entries():
-                message = handle_ready_for_supply_block(event)
-                await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
+            # Get the latest block
+            current_block = w3.eth.get_block('latest')['number']
             
-            # Check for SupplyBlockMined events
-            for event in supply_block_filter.get_new_entries():
-                message = handle_supply_block_mined(event)
-                await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
+            # Poll for events in the block range
+            if current_block > last_block:
+                # ReadyForSupplyBlock events
+                ready_events = contract.events.ReadyForSupplyBlock.get_logs(
+                    fromBlock=last_block + 1,
+                    toBlock=current_block
+                )
+                for event in ready_events:
+                    message = handle_ready_for_supply_block(event)
+                    await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
+                
+                # SupplyBlockMined events
+                supply_events = contract.events.SupplyBlockMined.get_logs(
+                    fromBlock=last_block + 1,
+                    toBlock=current_block
+                )
+                for event in supply_events:
+                    message = handle_supply_block_mined(event)
+                    await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
+                
+                last_block = current_block
             
             # Sleep to avoid overwhelming the node
             await asyncio.sleep(10)
             
         except Exception as e:
-            logger.error(f"Error in event loop: {e}")
+            logger.error(f"Error in polling loop: {e}")
             await asyncio.sleep(10)  # Wait before retrying
     
 if __name__ == "__main__":
