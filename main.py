@@ -18,6 +18,26 @@ TELEGRAM_CHAT_ID = "-1002696820701"     # Replace with your group chat ID
 RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
 CONTRACT_ADDRESS = "0x563A4c367900e13Fe18659126458DBb200F9A4ba"  # Replace with your SCADAManager address
 
+import asyncio
+from web3 import Web3
+from web3.middleware import geth_poa_middleware
+from telegram import Bot
+import json
+import logging
+from datetime import datetime
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Replace with your bot token
+TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"     # Replace with your group chat ID
+
+# Blockchain Configuration
+RPC_URL = "YOUR_PULSECHAIN_RPC_URL"  # Replace with PulseChain RPC URL
+CONTRACT_ADDRESS = "YOUR_CONTRACT_ADDRESS"  # Replace with your SCADAManager address
+
 # Contract ABI (same as before)
 CONTRACT_ABI = [
     {
@@ -57,41 +77,12 @@ async def send_telegram_message(bot, chat_id, message):
 
 def handle_ready_for_supply_block(event):
     """Handle ReadyForSupplyBlock event."""
-    ready = event['args']['ready']
-    extra_lp = event['args']['extraLP']
-    initial_lp = event['args']['initialLP']
-    threshold_bps = event['args']['thresholdBps']
-    
-    message = (
-        f"🚨 ReadyForSupplyBlock Event Emitted!\n"
-        f"Ready: {ready}\n"
-        f"Extra LP: {Web3.from_wei(extra_lp, 'ether')} LP\n"
-        f"Initial LP: {Web3.from_wei(initial_lp, 'ether')} LP\n"
-        f"Threshold (bps): {threshold_bps}"
-    )
-    return message
+    return "supplyBlock function ready"
 
 def handle_supply_block_mined(event):
     """Handle SupplyBlockMined event."""
-    lp_removed = event['args']['lpRemoved']
-    amount_scada = event['args']['amountSCADA']
-    amount_wpls = event['args']['amountWPLS']
-    scada_burned = event['args']['scadaBurned']
-    share_pool_reward = event['args']['sharePoolReward']
-    caller_reward = event['args']['callerReward']
     caller = event['args']['caller']
-    
-    message = (
-        f"🎉 SupplyBlockMined Event Emitted!\n"
-        f"LP Removed: {Web3.from_wei(lp_removed, 'ether')} LP\n"
-        f"SCADA Amount: {Web3.from_wei(amount_scada, 'ether')} SCADA\n"
-        f"WPLS Amount: {Web3.from_wei(amount_wpls, 'ether')} WPLS\n"
-        f"SCADA Burned: {Web3.from_wei(scada_burned, 'ether')} SCADA\n"
-        f"Share Pool Reward: {Web3.from_wei(share_pool_reward, 'ether')} SCADA\n"
-        f"Caller Reward: {Web3.from_wei(caller_reward, 'ether')} SCADA\n"
-        f"Caller: {caller}"
-    )
-    return message
+    return f"SupplyBlock executed by {caller}"
 
 async def main():
     """Main function to set up Web3 and Telegram bot."""
