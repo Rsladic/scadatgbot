@@ -2,7 +2,6 @@ import asyncio
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from telegram import Bot
-import json
 import logging
 from datetime import datetime
 
@@ -18,7 +17,7 @@ TELEGRAM_CHAT_ID = "-1002696820701"     # Replace with your group chat ID
 RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
 CONTRACT_ADDRESS = "0x563A4c367900e13Fe18659126458DBb200F9A4ba"  # Replace with your SCADAManager address
 
-# Contract ABI (same as before)
+# Contract ABI
 CONTRACT_ABI = [
     {
         "anonymous": False,
@@ -55,9 +54,26 @@ async def send_telegram_message(bot, chat_id, message):
     except Exception as e:
         logger.error(f"Failed to send Telegram message: {e}")
 
-def handle_ready_for_supply_block(event):
-    """Handle ReadyForSupplyBlock event."""
-    return "supplyBlock function ready"
+def handle_ready_for_supply_block(event, last_notified_extra_lp, contract, w3):
+    """Handle ReadyForSupplyBlock event, notify only when ready is true and extraLP crosses threshold."""
+    ready = event['args']['ready']
+    extra_lp = event['args']['extraLP']
+    initial_lp = event['args']['initialLP']
+    threshold_bps = event['args']['thresholdBps']
+    
+    # Calculate threshold
+    threshold = (initial_lp * threshold_bps) // 10_000
+    
+    # Notify only if ready is true and extraLP has significantly increased
+    if ready and extra_lp >= threshold and (last_notified_extra_lp == 0 or extra_lp >= last_notified_extra_lp + threshold // 10):
+        # Verify current state
+        try:
+            current_ready = contract.functions.readyForSupplyBlock().call()
+            if current_ready:
+                return "supplyBlock function ready", extra_lp
+        except Exception as e:
+            logger.error(f"Error calling readyForSupplyBlock: {e}")
+    return None, extra_lp
 
 def handle_supply_block_mined(event):
     """Handle SupplyBlockMined event."""
@@ -84,8 +100,9 @@ async def main():
     # Initialize Telegram bot
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     
-    # Track the last block processed
+    # Track the last block processed and last notified extraLP
     last_block = w3.eth.get_block('latest')['number']
+    last_notified_extra_lp = 0  # Track last extraLP for which we sent a notification
     
     logger.info("Starting event polling...")
     
@@ -102,8 +119,10 @@ async def main():
                     toBlock=current_block
                 )
                 for event in ready_events:
-                    message = handle_ready_for_supply_block(event)
-                    await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
+                    message, new_extra_lp = handle_ready_for_supply_block(event, last_notified_extra_lp, contract, w3)
+                    if message:
+                        await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
+                        last_notified_extra_lp = new_extra_lp
                 
                 # SupplyBlockMined events
                 supply_events = contract.events.SupplyBlockMined.get_logs(
@@ -113,6 +132,7 @@ async def main():
                 for event in supply_events:
                     message = handle_supply_block_mined(event)
                     await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
+                    last_notified_extra_lp = 0  # Reset after supplyBlock resets extraLP
                 
                 last_block = current_block
             
