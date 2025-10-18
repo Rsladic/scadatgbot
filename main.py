@@ -15,7 +15,7 @@ TELEGRAM_CHAT_ID = "-1002696820701"     # Replace with your group chat ID
 
 # Blockchain Configuration
 RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
-CONTRACT_ADDRESS = "0x69e23263927Ae53E5FF3A898d082a83B7D6fB438"  # Replace with your SCADAManager address
+CONTRACT_ADDRESS = "0x3B1489f3ea4643b7e7B29548e2E2cFEf094BB05E"  # Replace with your SCADAManager address
 
 # Contract ABI
 CONTRACT_ABI = [
