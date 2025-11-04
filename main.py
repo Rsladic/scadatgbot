@@ -9,9 +9,11 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+import os
+
 # Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN = "7783890337:AAHAX7bHTKtMR8T3hIYKTNTj-f8lJBNL6XU"  # Replace with your bot token
-TELEGRAM_CHAT_ID = "-1002696820701"     # Replace with your group chat ID
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # Blockchain Configuration
 RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
