@@ -16,6 +16,19 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+# Check if environment variables are loaded
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
+if not TELEGRAM_CHAT_ID:
+    raise ValueError("TELEGRAM_CHAT_ID environment variable is not set")
+
+# Debug: Print token info (but hide most of it for security)
+logger.info(f"Token length: {len(TELEGRAM_BOT_TOKEN)}")
+logger.info(f"Token starts with: {TELEGRAM_BOT_TOKEN[:10]}...")
+logger.info(f"Token ends with: ...{TELEGRAM_BOT_TOKEN[-10:]}")
+logger.info(f"Chat ID: {TELEGRAM_CHAT_ID}")
+logger.info("Environment variables loaded successfully")
+
 # Blockchain Configuration
 RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
 CONTRACT_ADDRESS = "0x3B1489f3ea4643b7e7B29548e2E2cFEf094BB05E"  # Replace with your SCADAManager address
