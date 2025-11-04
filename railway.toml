@@ -1,1 +1,4 @@
+[build]
+
+[deploy]
 startCommand = "python main.py"
