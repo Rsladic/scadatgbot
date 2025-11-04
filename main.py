@@ -1,3 +1,4 @@
+import os
 import asyncio
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
@@ -9,7 +10,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-import os
+
 
 # Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
