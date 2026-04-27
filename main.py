@@ -73,36 +73,37 @@ def init_chains():
     chain_states = {}
 
     for chain in CHAINS:
-        try:
-            w3 = Web3(Web3.HTTPProvider(chain["rpc"]))
+try:
+    w3 = Web3(Web3.HTTPProvider(chain["rpc"]))
 
-            if chain.get("poa"):
-                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+    if chain.get("poa"):
+        w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
-            if not w3.is_connected():
-                logger.error(f"{chain['name']} connection failed")
-                continue
+    if not w3.is_connected():
+        logger.error(f"{chain['name']} connection failed")
+        continue
 
-checksum_address = Web3.to_checksum_address(chain["contract"])
 
-contract = w3.eth.contract(
-    address=checksum_address,
-    abi=CONTRACT_ABI
-)
+    checksum_address = Web3.to_checksum_address(chain["contract"])
 
-            latest_block = w3.eth.get_block("latest")["number"]
+    contract = w3.eth.contract(
+        address=checksum_address,
+        abi=CONTRACT_ABI
+    )
 
-            chain_states[chain["name"]] = {
-                "w3": w3,
-                "contract": contract,
-                "last_block": latest_block,
-                "last_ready": False
-            }
+    latest_block = w3.eth.get_block("latest")["number"]
 
-            logger.info(f"{chain['name']} initialized at block {latest_block}")
+    chain_states[chain["name"]] = {
+        "w3": w3,
+        "contract": contract,
+        "last_block": latest_block,
+        "last_ready": False
+    }
 
-        except Exception as e:
-            logger.error(f"Failed to init {chain['name']}: {e}")
+    logger.info(f"{chain['name']} initialized at block {latest_block}")
+
+except Exception as e:
+    logger.error(f"Failed to init {chain['name']}: {e}")
 
     return chain_states
 
