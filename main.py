@@ -1,50 +1,32 @@
 import os
 import asyncio
+import logging
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from telegram import Bot
-import logging
-from datetime import datetime
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# -------------------- LOGGING --------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
-
-
-# Telegram Bot Configuration
+# -------------------- TELEGRAM --------------------
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# Check if environment variables are loaded
-if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
-if not TELEGRAM_CHAT_ID:
-    raise ValueError("TELEGRAM_CHAT_ID environment variable is not set")
+if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    raise ValueError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID")
 
-# Debug: Print token info (but hide most of it for security)
-logger.info(f"Token length: {len(TELEGRAM_BOT_TOKEN)}")
-logger.info(f"Token starts with: {TELEGRAM_BOT_TOKEN[:10]}...")
-logger.info(f"Token ends with: ...{TELEGRAM_BOT_TOKEN[-10:]}")
-logger.info(f"Chat ID: {TELEGRAM_CHAT_ID}")
-logger.info("Environment variables loaded successfully")
-
-# Blockchain Configuration
-RPC_URL = "https://rpc.pulsechain.com"  # Replace with PulseChain RPC URL
-CONTRACT_ADDRESS = "0x3B1489f3ea4643b7e7B29548e2E2cFEf094BB05E"  # Replace with your SCADAManager address
-
-# Contract ABI
+# -------------------- CONTRACT ABI --------------------
 CONTRACT_ABI = [
     {
-        "anonymous": False,
-        "inputs": [
-            {"indexed": False, "name": "ready", "type": "bool"},
-            {"indexed": False, "name": "extraLP", "type": "uint256"},
-            {"indexed": False, "name": "initialLP", "type": "uint256"},
-            {"indexed": False, "name": "thresholdBps", "type": "uint256"}
-        ],
-        "name": "ReadyForSupplyBlock",
-        "type": "event"
+        "inputs": [],
+        "name": "readyForSupplyBlock",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "view",
+        "type": "function"
     },
     {
         "anonymous": False,
@@ -59,90 +41,133 @@ CONTRACT_ABI = [
         ],
         "name": "SupplyBlockMined",
         "type": "event"
-    },
-    {
-        "inputs": [],
-        "name": "readyForSupplyBlock",
-        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-        "stateMutability": "view",
-        "type": "function"
     }
 ]
 
-async def send_telegram_message(bot, chat_id, message):
-    """Send a message to the Telegram group."""
+# -------------------- CHAIN CONFIG --------------------
+CHAINS = [
+    {
+        "name": "PulseChain",
+        "rpc": "https://rpc.pulsechain.com",
+        "contract": "0x3B1489f3ea4643b7e7B29548e2E2cFEf094BB05E",
+        "poa": True
+    },
+    {
+        "name": "Ethereum",
+        "rpc": "https://ethereum-sepolia-rpc.publicnode.com",
+        "contract": "0xd7eac132347d4786248d665357aae8e33e8c0ed8",
+        "poa": False
+    }
+]
+
+# -------------------- TELEGRAM SEND --------------------
+async def send_telegram_message(bot, message):
     try:
-        await bot.send_message(chat_id=chat_id, text=message)
-        logger.info(f"Sent Telegram message: {message}")
+        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        logger.info(f"Sent: {message}")
     except Exception as e:
-        logger.error(f"Failed to send Telegram message: {e}")
+        logger.error(f"Telegram error: {e}")
 
-def handle_supply_block_mined(event):
-    """Handle SupplyBlockMined event."""
-    caller = event['args']['caller']
-    return f"SupplyBlock executed by {caller}"
+# -------------------- INIT CHAINS --------------------
+def init_chains():
+    chain_states = {}
 
-async def main():
-    """Main function to set up Web3 and Telegram bot."""
-    # Initialize Web3
-    w3 = Web3(Web3.HTTPProvider(RPC_URL))
-    
-    # Add PoA middleware for PulseChain
-    w3.middleware_onion.inject(geth_poa_middleware, layer=0)
-    
-    if not w3.is_connected():
-        logger.error("Failed to connect to PulseChain node")
-        return
-    
-    logger.info("Connected to PulseChain node")
-    
-    # Initialize contract
-    contract = w3.eth.contract(address=CONTRACT_ADDRESS, abi=CONTRACT_ABI)
-    
-    # Initialize Telegram bot
-    bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    
-    # Track the last block processed and last ready state
-    last_block = w3.eth.get_block('latest')['number']
-    last_ready_state = False  # Track if ready was true in last check
-    
-    logger.info("Starting polling...")
-    
-    while True:
+    for chain in CHAINS:
         try:
-            # Get the latest block for SupplyBlockMined events
-            current_block = w3.eth.get_block('latest')['number']
-            
-            # Check readyForSupplyBlock() boolean
-            try:
-                current_ready = contract.functions.readyForSupplyBlock().call()
-                if current_ready and not last_ready_state:
-                    await send_telegram_message(bot, TELEGRAM_CHAT_ID, "supplyBlock function ready")
-                    last_ready_state = True
-                elif not current_ready and last_ready_state:
-                    last_ready_state = False  # Reset when ready becomes false
-            except Exception as e:
-                logger.error(f"Error calling readyForSupplyBlock: {e}")
-            
-            # Poll for SupplyBlockMined events
-            if current_block > last_block:
-                supply_events = contract.events.SupplyBlockMined.get_logs(
-                    fromBlock=last_block + 1,
-                    toBlock=current_block
-                )
-                for event in supply_events:
-                    message = handle_supply_block_mined(event)
-                    await send_telegram_message(bot, TELEGRAM_CHAT_ID, message)
-                    last_ready_state = False  # Reset after supplyBlock resets extraLP
-                
-                last_block = current_block
-            
-            # Sleep to avoid overwhelming the node
-            await asyncio.sleep(10)
-            
+            w3 = Web3(Web3.HTTPProvider(chain["rpc"]))
+
+            if chain.get("poa"):
+                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+
+            if not w3.is_connected():
+                logger.error(f"{chain['name']} connection failed")
+                continue
+
+            contract = w3.eth.contract(
+                address=chain["contract"],
+                abi=CONTRACT_ABI
+            )
+
+            latest_block = w3.eth.get_block("latest")["number"]
+
+            chain_states[chain["name"]] = {
+                "w3": w3,
+                "contract": contract,
+                "last_block": latest_block,
+                "last_ready": False
+            }
+
+            logger.info(f"{chain['name']} initialized at block {latest_block}")
+
         except Exception as e:
-            logger.error(f"Error in polling loop: {e}")
-            await asyncio.sleep(10)  # Wait before retrying
-    
+            logger.error(f"Failed to init {chain['name']}: {e}")
+
+    return chain_states
+
+# -------------------- MAIN LOOP --------------------
+async def monitor():
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    chain_states = init_chains()
+
+    if not chain_states:
+        logger.error("No chains initialized. Exiting.")
+        return
+
+    logger.info("Monitoring started...")
+
+    while True:
+        for name, state in chain_states.items():
+            try:
+                w3 = state["w3"]
+                contract = state["contract"]
+
+                # -------- READY CHECK --------
+                try:
+                    current_ready = contract.functions.readyForSupplyBlock().call()
+
+                    if current_ready and not state["last_ready"]:
+                        await send_telegram_message(
+                            bot,
+                            f"supplyBlock on {name} ready"
+                        )
+                        state["last_ready"] = True
+
+                    elif not current_ready and state["last_ready"]:
+                        state["last_ready"] = False
+
+                except Exception as e:
+                    logger.error(f"{name} ready() error: {e}")
+
+                # -------- EVENT CHECK --------
+                try:
+                    current_block = w3.eth.get_block("latest")["number"]
+
+                    if current_block > state["last_block"]:
+                        events = contract.events.SupplyBlockMined.get_logs(
+                            fromBlock=state["last_block"] + 1,
+                            toBlock=current_block
+                        )
+
+                        for event in events:
+                            caller = event["args"]["caller"]
+
+                            await send_telegram_message(
+                                bot,
+                                f"SupplyBlock executed on {name} by {caller}"
+                            )
+
+                            state["last_ready"] = False
+
+                        state["last_block"] = current_block
+
+                except Exception as e:
+                    logger.error(f"{name} event error: {e}")
+
+            except Exception as e:
+                logger.error(f"{name} loop error: {e}")
+
+        await asyncio.sleep(10)
+
+# -------------------- ENTRY --------------------
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(monitor())
