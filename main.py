@@ -71,39 +71,34 @@ async def send_telegram_message(bot, message):
 # -------------------- INIT CHAINS --------------------
 def init_chains():
     chain_states = {}
-
     for chain in CHAINS:
-try:
-    w3 = Web3(Web3.HTTPProvider(chain["rpc"]))
+        try:
+            w3 = Web3(Web3.HTTPProvider(chain["rpc"]))
+            if chain.get("poa"):
+                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+            if not w3.is_connected():
+                logger.error(f"{chain['name']} connection failed")
+                continue
 
-    if chain.get("poa"):
-        w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+            checksum_address = Web3.to_checksum_address(chain["contract"])
+            contract = w3.eth.contract(
+                address=checksum_address,
+                abi=CONTRACT_ABI
+            )
+            latest_block = w3.eth.get_block("latest")["number"]
 
-    if not w3.is_connected():
-        logger.error(f"{chain['name']} connection failed")
-        continue
+            chain_states[chain["name"]] = {
+                "w3": w3,
+                "contract": contract,
+                "last_block": latest_block,
+                "last_ready": False
+            }
+            logger.info(f"{chain['name']} initialized at block {latest_block}")
 
-
-    checksum_address = Web3.to_checksum_address(chain["contract"])
-
-    contract = w3.eth.contract(
-        address=checksum_address,
-        abi=CONTRACT_ABI
-    )
-
-    latest_block = w3.eth.get_block("latest")["number"]
-
-    chain_states[chain["name"]] = {
-        "w3": w3,
-        "contract": contract,
-        "last_block": latest_block,
-        "last_ready": False
-    }
-
-    logger.info(f"{chain['name']} initialized at block {latest_block}")
-
-except Exception as e:
-    logger.error(f"Failed to init {chain['name']}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to init {chain['name']}: {e}")
+            # continue to next chain instead of returning early
+            continue
 
     return chain_states
 
