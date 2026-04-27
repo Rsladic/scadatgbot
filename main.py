@@ -83,10 +83,12 @@ def init_chains():
                 logger.error(f"{chain['name']} connection failed")
                 continue
 
-            contract = w3.eth.contract(
-                address=chain["contract"],
-                abi=CONTRACT_ABI
-            )
+checksum_address = Web3.to_checksum_address(chain["contract"])
+
+contract = w3.eth.contract(
+    address=checksum_address,
+    abi=CONTRACT_ABI
+)
 
             latest_block = w3.eth.get_block("latest")["number"]
 
