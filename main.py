@@ -54,8 +54,8 @@ CHAINS = [
     },
     {
         "name": "Ethereum",
-        "rpc": "https://ethereum-sepolia-rpc.publicnode.com",
-        "contract": "0xd7eac132347d4786248d665357aae8e33e8c0ed8",
+        "rpc": "https://ethereum.publicnode.com",
+        "contract": "0x276A2E717f8fBcB0716Ef1290BffB376329bd2aD",
         "poa": False
     }
 ]
